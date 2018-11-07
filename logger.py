@@ -20,14 +20,14 @@ def get_logger(name):
     return logging.getLogger(name)
 
 
-def log(show_params=True, show_result=False):
+def log(params=True, result=True):
     def wrapped(func):
         logger = logging.getLogger(func.__module__)
         
         @wraps(func)
         def inner_wrapped(*args, **kwargs):
             log_str = f"{func.__name__}() is called "
-            if show_params:
+            if params:
                 log_str += f"with params {args} and {kwargs} "
             logger.debug(log_str)
 

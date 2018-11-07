@@ -12,6 +12,8 @@ from logger import log, get_logger
 CALC_TIME = 15
 # Estimated time to complete all backtests in the queue
 DONE_TIME = 180
+# No. of vCPU in t3.micro instance type
+VCPU_COUNT = 2
 # Pause between runs
 PAUSE = 60
 
@@ -19,7 +21,7 @@ ec2 = boto3.resource('ec2')
 logger = get_logger(__name__)
 
 
-@log(show_params=False, show_result=True)
+@log(params=False)
 def get_queue_len():
     """Request a number of backtest."""
     try:
@@ -31,15 +33,17 @@ def get_queue_len():
         return response['count']
 
 
+@log()
 def calc_needed_instances(queue_len, 
                           calc_time=CALC_TIME, 
-                          done_time=DONE_TIME):
+                          done_time=DONE_TIME,
+                          vCPU_count=VCPU_COUNT):
     """Count number of instances needed to complete a queue in 5 minutes."""
-    return queue_len * calc_time / done_time
+    return queue_len * calc_time / done_time / vCPU_count
 
 
 
-@log(show_result=True)
+@log()
 def create_instances(count, dry_run=False):
     instances = ec2.create_instances(
         ImageId='ami-14fb1073', InstanceType='t2.micro',
@@ -67,7 +71,7 @@ def main():
         sleep(PAUSE) 
 
 
-@log(show_result=True)
+@log()
 def deb():  
     # return ec2.meta.client.describe_images(
     #     Owners=['amazon'], Filters=[
@@ -83,15 +87,13 @@ def deb():
     return create_instances(1)
 
 
-@log(show_result=True, show_params=False)
+@log(params=False)
 def terminate_instances():
     return ec2.instances.all().terminate()
 
 
 if __name__ == '__main__':
     insts = create_instances(1)
-    tp = [type(i) is ec2.Instance for i in insts]
-    print(tp)
     terminate_instances()
     pass
 
