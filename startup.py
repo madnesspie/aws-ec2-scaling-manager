@@ -1,3 +1,4 @@
+import signal
 from time import sleep
 from math import ceil
 
@@ -16,10 +17,25 @@ DONE_TIME = 300
 # No. of vCPU in t3.micro instance type
 VCPU_COUNT = 2
 # Pause between runs
-PAUSE = 2
+PAUSE = 1
 
 ec2 = boto3.resource('ec2')
 logger = get_logger(__name__)
+
+
+class GracefulKiller:
+
+    def __init__(self):
+        self.__kill_now = False
+        signal.signal(signal.SIGINT, self.exit_gracefully)
+        signal.signal(signal.SIGTERM, self.exit_gracefully)
+
+    @property
+    def kill_now(self):
+        return self.__kill_now
+
+    def exit_gracefully(self, signum, frame):
+        self.__kill_now = True
 
 
 @log(params=False)
@@ -84,13 +100,18 @@ def run():
 
 @log(result=False, params=False)
 def start():
+    killer = GracefulKiller()
     while True: 
         try:
             run()
         except BaseException as e:
             logger.error(f"Somth error: {e}")
         finally:
+            if killer.kill_now:
+                break
             sleep(PAUSE)
+
+    logger.critical(f"He lived without fear and died without fear!")
 
 
 if __name__ == '__main__':
