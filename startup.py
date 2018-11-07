@@ -1,4 +1,5 @@
 from time import sleep
+from math import ceil
 
 import boto3
 import requests
@@ -8,14 +9,14 @@ from botocore.exceptions import ClientError
 from logger import log, get_logger
 
 # TODO: Calculate automatically
-# Amazone AWS backtest calculation time 
+# Amazone AWS backtest calculation time in sec.
 CALC_TIME = 15
-# Estimated time to complete all backtests in the queue
-DONE_TIME = 180
+# Estimated time to complete all backtests in the queue in sec.
+DONE_TIME = 300
 # No. of vCPU in t3.micro instance type
 VCPU_COUNT = 2
 # Pause between runs
-PAUSE = 60
+PAUSE = 2
 
 ec2 = boto3.resource('ec2')
 logger = get_logger(__name__)
@@ -26,9 +27,9 @@ def get_queue_len():
     """Request a number of backtest."""
     try:
         response = requests.get('https://pastebin.com/raw/bKdgMA3N').json()
-    except RequestException as e:
+    except RequestException:
         logger.warning(f"Request for number of backtests failed!")
-        return 
+        raise 
     else: 
         return response['count']
 
@@ -39,64 +40,63 @@ def calc_needed_instances(queue_len,
                           done_time=DONE_TIME,
                           vCPU_count=VCPU_COUNT):
     """Count number of instances needed to complete a queue in 5 minutes."""
-    return queue_len * calc_time / done_time / vCPU_count
-
+    return ceil(queue_len * calc_time / done_time / vCPU_count)
 
 
 @log()
 def create_instances(count, dry_run=False):
+    """Creates the required count of instances."""
     instances = ec2.create_instances(
         ImageId='ami-14fb1073', InstanceType='t2.micro',
         MinCount=count, MaxCount=count, DryRun=dry_run)
     return instances
 
 
-def main():
-    n_current_instances = 0
-    while True: 
-        queue_len = get_queue_len()
-        if queue_len == 0:
-            # TODO: Stop all instances
-            pass
-
-        n_needed_instances = calc_needed_instances(queue_len)
-        if n_needed_instances > n_current_instances:
-            # TODO: Add new instances
-            pass
-        else:
-            # QUESTION: Если инстанстов больше/достаточно то мы 
-            # ничего не делаем?
-            pass 
-
-        sleep(PAUSE) 
-
-
-@log()
-def deb():  
-    # return ec2.meta.client.describe_images(
-    #     Owners=['amazon'], Filters=[
-    #         {
-    #             'Name': 'platform',
-    #             'Values': [
-    #                 'ubuntu',
-    #             ]
-    #         },
-    #     ],
-    # )
-    # return ec2.meta.client.describe_instance_status()
-    return create_instances(1)
+@log(result=False)
+def check_instances(queue_len):
+    """Checks if instances are needed."""
+    needed = calc_needed_instances(queue_len)
+    current = len(ec2.instances.all())
+    if needed > current:
+        difference = needed - current
+        create_instances(count=difference)
+    else:
+        # Если инстанстов больше/достаточно то мы ничего не делаем
+        pass
 
 
 @log(params=False)
 def terminate_instances():
+    """Terminate all instances"""
+    # Можно не убивать, а останавливать машины, позже включать. 
+    # Пока не смотрел будет ли профит с этого.
     return ec2.instances.all().terminate()
 
 
-if __name__ == '__main__':
-    insts = create_instances(1)
-    terminate_instances()
-    pass
+@log(result=False, params=False)
+def run():
+    queue_len = get_queue_len()
+    if queue_len == 0:
+        terminate_instances()
+    else:
+        check_instances(queue_len)
 
+
+@log(result=False, params=False)
+def start():
+    while True: 
+        try:
+            run()
+        except BaseException as e:
+            logger.error(f"Somth error: {e}")
+        finally:
+            sleep(PAUSE)
+
+
+if __name__ == '__main__':
+    start()
+    # insts = create_instances(1)
+    # terminate_instances()
 
 # def dry_start_instances(func):
 #     @wraps(func)
@@ -108,12 +108,3 @@ if __name__ == '__main__':
 #                 raise
 #         return func(*args, **kwargs)
 #     return wrapped
-
-
-# @dry_start_instances
-# def start_instances():
-#     try:
-#         response = ec2.start_instances(InstanceIds=[instance_id], DryRun=False)
-#         print(response)
-#     except ClientError as e:
-#         print(e)
