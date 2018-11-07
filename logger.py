@@ -14,6 +14,7 @@ logging.addLevelName(logging.DEBUG, '🐛 DEBUG')
 logging.addLevelName(logging.INFO, '📑 INFO')
 logging.addLevelName(logging.WARNING, '🤔 WARNING')
 logging.addLevelName(logging.ERROR, '🚨 ERROR')
+logging.addLevelName(logging.CRITICAL, '💥 CRITICAL')
 
 
 def get_logger(name):
