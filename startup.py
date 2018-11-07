@@ -39,10 +39,11 @@ def calc_needed_instances(queue_len,
 
 
 
-def create_instances(needed):
+@log(show_result=True)
+def create_instances(count, dry_run=False):
     instances = ec2.create_instances(
-        ImageId='ami-0f65671a86f061fcd', InstanceType='t1.micro', 
-        MinCount=needed, MaxCount=needed)
+        ImageId='ami-14fb1073', InstanceType='t2.micro',
+        MinCount=count, MaxCount=count, DryRun=dry_run)
     return instances
 
 
@@ -65,15 +66,34 @@ def main():
 
         sleep(PAUSE) 
 
+
 @log(show_result=True)
-def deb():
-    get_queue_len()
-    response = ec2.meta.client.describe_instance_status()
-    return response
+def deb():  
+    # return ec2.meta.client.describe_images(
+    #     Owners=['amazon'], Filters=[
+    #         {
+    #             'Name': 'platform',
+    #             'Values': [
+    #                 'ubuntu',
+    #             ]
+    #         },
+    #     ],
+    # )
+    # return ec2.meta.client.describe_instance_status()
+    return create_instances(1)
+
+
+@log(show_result=True, show_params=False)
+def terminate_instances():
+    return ec2.instances.all().terminate()
 
 
 if __name__ == '__main__':
-    deb()
+    insts = create_instances(1)
+    tp = [type(i) is ec2.Instance for i in insts]
+    print(tp)
+    terminate_instances()
+    pass
 
 
 # def dry_start_instances(func):
