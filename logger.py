@@ -5,8 +5,8 @@ logging.basicConfig(
     format='%(asctime)s ~ %(levelname)-10s %(name)-25s %(message)s',
     datefmt='%Y-%m-%d %H:%M', level=logging.DEBUG)  # , filename='*.log')
 
-logging.getLogger('boto3').setLevel(logging.INFO)
-logging.getLogger('botocore').setLevel(logging.INFO)
+logging.getLogger('boto3').setLevel(logging.WARNING)
+logging.getLogger('botocore').setLevel(logging.WARNING)
 logging.getLogger('requests').setLevel(logging.WARNING)
 logging.getLogger('urllib3').setLevel(logging.WARNING)
 
@@ -32,7 +32,7 @@ def log(params=True, result=True):
             logger.debug(log_str)
 
             result = func(*args, **kwargs)
-            if show_result:
+            if result:
                 logger.debug(f"{func.__name__}() returned {result} ")
             return result
         
