@@ -7,6 +7,7 @@ import requests
 from requests.exceptions import RequestException
 from botocore.exceptions import ClientError
 
+from config import CALC_TIME, DONE_TIME, VCPU_COUNT, PAUSE
 from logger import log, get_logger
 
 # TODO: Calculate automatically
@@ -95,9 +96,8 @@ def run():
 @log(result=False, params=False)
 def start():
     killer = GracefulKiller()
-
-    import os
-    print(os.getpid())
+    # import os
+    # print(os.getpid())
 
     while killer.pardoned:
         try:
