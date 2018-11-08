@@ -1,6 +1,8 @@
 import signal
 from time import sleep
 from math import ceil
+from traceback import format_exc
+from functools import wraps
 
 import boto3
 import requests
@@ -9,16 +11,6 @@ from botocore.exceptions import ClientError
 
 from config import CALC_TIME, DONE_TIME, VCPU_COUNT, PAUSE
 from logger import log, get_logger
-
-# TODO: Calculate automatically
-# Amazone AWS backtest calculation time in sec.
-CALC_TIME = 15
-# Estimated time to complete all backtests in the queue in sec.
-DONE_TIME = 300
-# No. of vCPU in t3.micro instance type
-VCPU_COUNT = 2
-# Pause between runs
-PAUSE = 5
 
 ec2 = boto3.resource('ec2')
 logger = get_logger(__name__)
@@ -31,6 +23,21 @@ class GracefulKiller:
 
     def exit_gracefully(self, signum, frame):
         self.pardoned = False
+
+
+def dry_run(func):
+    @wraps(func)
+    def wrapped(*args, **kwargs):
+        """Do a dryrun first to verify permissions."""
+        try:
+            return func(dry_run=True, *args, **kwargs)
+        except ClientError as e:
+            if 'DryRunOperation' in str(e):
+                return func(*args, **kwargs)
+            else:
+                # If not permissions
+                raise
+    return wrapped
 
 
 @log(params=False)
@@ -55,6 +62,7 @@ def calc_needed_instances(queue_len,
 
 
 @log()
+@dry_run
 def create_instances(count, dry_run=False):
     """Creates the required count of instances."""
     instances = ec2.create_instances(
@@ -77,6 +85,7 @@ def check_instances(queue_len):
 
 
 @log(params=False)
+@dry_run
 def terminate_instances():
     """Terminate all instances"""
     # Можно не убивать, а останавливать машины, позже включать. 
@@ -98,32 +107,22 @@ def start():
     killer = GracefulKiller()
     # import os
     # print(os.getpid())
-
     while killer.pardoned:
         try:
             # run()
             pass
-        except BaseException as e:
-            logger.error(f"Somth error: {e}")
+        except BaseException:
+            logger.error(f"{format_exc}")
         finally:
-            # logger.debug(f"Pause...")
             sleep(PAUSE)
 
     logger.critical(f"He lived without fear and died without fear!")
 
 
 if __name__ == '__main__':
-    start()
-    # insts = create_instances(1)
-    # terminate_instances()
+    # start()
+    print(111111)
+    insts = create_instances(2)
+    terminate_instances()
 
-# def dry_start_instances(func):
-#     @wraps(func)
-#     def wrapped(*args, **kwargs):
-#         try:
-#             ec2.start_instances(InstanceIds=[instance_id], DryRun=True)
-#         except ClientError as e:
-#             if 'DryRunOperation' not in str(e):
-#                 raise
-#         return func(*args, **kwargs)
-#     return wrapped
+
