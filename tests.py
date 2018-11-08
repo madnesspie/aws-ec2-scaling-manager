@@ -6,26 +6,31 @@ from time import sleep
 
 import moto
 
-from startup import create_instances, run, GracefulKiller, calc_needed_instances
 from config import CALC_TIME, DONE_TIME, VCPU_COUNT
+from startup import (
+    create_instances, run, GracefulKiller, calc_needed_instances,
+    request_queue_len, get_queue_len)
 
 
 class TestGetQueueLen(unittest.TestCase):
-    @patch('startup.get_queue_len', return_value=100)
-    def test_get_queue_len(self, get_queue_len):
+    # @patch('startup.get_queue_len', return_value=100)
+    def test_get_queue_len(self):
         queue_len = get_queue_len()
         self.assertIsNotNone(queue_len)
         self.assertIsInstance(queue_len, int)
+
+    def test_request_queue_len(self):
+        response = request_queue_len()
+        self.assertEqual(response.status_code, 200)
 
 
 class TestCalcNeededInstances(unittest.TestCase):
     def test_complete_in_done_time(self):
         queue_len = 1000
         instances = calc_needed_instances(queue_len)
-        print(instances)
         need_time = queue_len * CALC_TIME / (instances * VCPU_COUNT)
-        print(need_time)
         self.assertGreaterEqual(DONE_TIME, need_time)
+
 
 # class TestRun(unittest.TestCase):
 #     pass

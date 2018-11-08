@@ -40,16 +40,20 @@ def dry_run(func):
     return wrapped
 
 
-@log(params=False)
-def get_queue_len():
+def request_queue_len():
     """Request a number of backtest."""
     try:
-        response = requests.get('https://pastebin.com/raw/bKdgMA3N').json()
+        return requests.get('https://pastebin.com/raw/bKdgMA3N')
     except RequestException:
         logger.warning(f"Request for number of backtests failed!")
-        raise 
-    else: 
-        return response['count']
+        raise
+
+
+@log(params=False)
+def get_queue_len():
+    result = request_queue_len().json()
+    return result['count']
+    
 
 
 @log()
@@ -121,7 +125,6 @@ def start():
 
 if __name__ == '__main__':
     # start()
-    print(111111)
     insts = create_instances(2)
     terminate_instances()
 
