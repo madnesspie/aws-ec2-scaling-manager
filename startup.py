@@ -17,25 +17,19 @@ DONE_TIME = 300
 # No. of vCPU in t3.micro instance type
 VCPU_COUNT = 2
 # Pause between runs
-PAUSE = 1
+PAUSE = 5
 
 ec2 = boto3.resource('ec2')
 logger = get_logger(__name__)
 
 
 class GracefulKiller:
-
     def __init__(self):
-        self.__kill_now = False
-        signal.signal(signal.SIGINT, self.exit_gracefully)
+        self.pardoned = True
         signal.signal(signal.SIGTERM, self.exit_gracefully)
 
-    @property
-    def kill_now(self):
-        return self.__kill_now
-
     def exit_gracefully(self, signum, frame):
-        self.__kill_now = True
+        self.pardoned = False
 
 
 @log(params=False)
@@ -101,14 +95,18 @@ def run():
 @log(result=False, params=False)
 def start():
     killer = GracefulKiller()
-    while True: 
+
+    import os
+    print(os.getpid())
+
+    while killer.pardoned:
         try:
-            run()
+            # run()
+            pass
         except BaseException as e:
             logger.error(f"Somth error: {e}")
         finally:
-            if killer.kill_now:
-                break
+            # logger.debug(f"Pause...")
             sleep(PAUSE)
 
     logger.critical(f"He lived without fear and died without fear!")
