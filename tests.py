@@ -1,10 +1,51 @@
+import os
+import signal
 import unittest
 from unittest.mock import patch
+from time import sleep
+
 import moto
 
-from startup import create_instances
+from startup import create_instances, run, GracefulKiller, calc_needed_instances
+from config import CALC_TIME, DONE_TIME, VCPU_COUNT
 
-# [Тестируемый метод]_[Сценарий]_[Ожидаемое поведение]
+
+class TestGetQueueLen(unittest.TestCase):
+    @patch('startup.get_queue_len', return_value=100)
+    def test_get_queue_len(self, get_queue_len):
+        queue_len = get_queue_len()
+        self.assertIsNotNone(queue_len)
+        self.assertIsInstance(queue_len, int)
+
+
+class TestCalcNeededInstances(unittest.TestCase):
+    def test_complete_in_done_time(self):
+        queue_len = 1000
+        instances = calc_needed_instances(queue_len)
+        print(instances)
+        need_time = queue_len * CALC_TIME / (instances * VCPU_COUNT)
+        print(need_time)
+        self.assertGreaterEqual(DONE_TIME, need_time)
+
+# class TestRun(unittest.TestCase):
+#     pass
+    
+
+# class MockGracefulKiller(GracefulKiller):
+#     def __init__(self):
+#         signal.signal(signal.SIGALRM, self.exit_gracefully)
+#         super()
+
+
+# class TestGracefulKiller(unittest.TestCase):
+#     @patch('startup.GracefulKiller', side_effect=MockGracefulKiller)
+#     def test_handle_signal(self, MockGracefulKiller):
+#         killer = MockGracefulKiller()
+#         signal.alarm(1)
+#         sleep(1.1)
+#         self.assertTrue(killer.kill_now)
+#         self.assertTrue(killer.exit_gracefully.assert_called_once())
+
 
 # class TestEC2CreateInstances(unittest.TestCase):
 
@@ -21,12 +62,4 @@ from startup import create_instances
 
 # class TestCalc(unittest.TestCase):
 #     pass
-
-
-class TestGetQueueLen(unittest.TestCase):
-    @patch('startup.get_queue_len', return_value=100)
-    def test_get_queue_len(self, get_queue_len):
-        queue_len = get_queue_len()
-        self.assertIsNotNone(queue_len)
-        self.assertIsInstance(queue_len, int)
 
