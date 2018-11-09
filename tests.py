@@ -4,24 +4,24 @@ import unittest
 from unittest.mock import patch
 from time import sleep
 
-import moto
+import boto3
+from moto import mock_ec2
 
 from config import CALC_TIME, DONE_TIME, VCPU_COUNT
 from startup import (
-    create_instances, run, GracefulKiller, calc_needed_instances,
-    request_queue_len, get_queue_len)
+    create_instances, terminate_instances, run, GracefulKiller, 
+    calc_needed_instances, request_queue_len, get_queue_len)
 
 
 class TestGetQueueLen(unittest.TestCase):
-    # @patch('startup.get_queue_len', return_value=100)
-    def test_get_queue_len(self):
-        queue_len = get_queue_len()
-        self.assertIsNotNone(queue_len)
-        self.assertIsInstance(queue_len, int)
 
-    def test_request_queue_len(self):
+    @patch('startup.requests.get')
+    def test_request_queue_len(self, mock_get):
+        mock_get.return_value.json.return_value = {"count": 123}
+        mock_get.return_value.status_code = 200
         response = request_queue_len()
         self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['count'], 123)
 
 
 class TestCalcNeededInstances(unittest.TestCase):
@@ -30,6 +30,30 @@ class TestCalcNeededInstances(unittest.TestCase):
         instances = calc_needed_instances(queue_len)
         need_time = queue_len * CALC_TIME / (instances * VCPU_COUNT)
         self.assertGreaterEqual(DONE_TIME, need_time)
+
+
+@mock_ec2
+class TestEC2CreateInstances(unittest.TestCase):
+    def test_create_instances(self):
+        # TODO: Fix PendingDeprecationWarning
+        instances = create_instances(2)
+        is_instances = [i.image_id == 'ami-14fb1073' for i in instances]
+        self.assertTrue(all(is_instances))
+
+
+if __name__ == "__main__":
+    unittest.main()
+
+# class TestEC2TerminateInstances(unittest.TestCase):
+#     def test_terminate_instances(self):
+#         ec2 = boto3.resource('ec2')
+#         instance = create_instances(1)[0]
+#         print(ec2.create_instances.call_count)
+        # terminate_instances()
+        # self.assertFalse(instance.state['Name'] == 'terminated')
+
+
+
 
 
 # class TestRun(unittest.TestCase):
@@ -64,7 +88,5 @@ class TestCalcNeededInstances(unittest.TestCase):
 
 
 
-
 # class TestCalc(unittest.TestCase):
 #     pass
-
