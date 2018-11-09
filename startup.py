@@ -127,5 +127,6 @@ if __name__ == '__main__':
     # start()
     insts = create_instances(2)
     terminate_instances()
+    # print(type(request_queue_len().json()))
 
 
