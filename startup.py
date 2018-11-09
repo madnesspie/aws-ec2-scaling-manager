@@ -55,7 +55,6 @@ def get_queue_len():
     return result['count']
     
 
-
 @log()
 def calc_needed_instances(queue_len, 
                           calc_time=CALC_TIME, 
@@ -79,22 +78,22 @@ def create_instances(count, dry_run=False):
 def check_instances(queue_len):
     """Checks if instances are needed."""
     needed = calc_needed_instances(queue_len)
-    current = len(ec2.instances.all())
+    current = len(list(ec2.instances.all()))
     if needed > current:
         difference = needed - current
         create_instances(count=difference)
     else:
+        logger.debug(f"Instances is enough")
         # Если инстанстов больше/достаточно то мы ничего не делаем
-        pass
 
 
 @log(params=False)
 @dry_run
-def terminate_instances():
+def terminate_instances(dry_run=False):
     """Terminate all instances"""
     # Можно не убивать, а останавливать машины, позже включать. 
     # Пока не смотрел будет ли профит с этого.
-    return ec2.instances.all().terminate()
+    return ec2.instances.all().terminate(DryRun=dry_run)
 
 
 @log(result=False, params=False)
@@ -113,10 +112,9 @@ def start():
     # print(os.getpid())
     while killer.pardoned:
         try:
-            # run()
-            pass
+            run()
         except BaseException:
-            logger.error(f"{format_exc}")
+            logger.error(f"{format_exc()}")
         finally:
             sleep(PAUSE)
 
@@ -124,9 +122,8 @@ def start():
 
 
 if __name__ == '__main__':
-    # start()
-    insts = create_instances(2)
-    terminate_instances()
-    # print(type(request_queue_len().json()))
+    start()
+    # insts = create_instances(2)
+    # terminate_instances()
 
 

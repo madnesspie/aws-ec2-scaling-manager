@@ -6,4 +6,5 @@ DONE_TIME = 300
 # No. of vCPU in t3.micro instance type
 VCPU_COUNT = 2
 # Pause between runs
-PAUSE = 10
+PAUSE = 45
+# Instance type
