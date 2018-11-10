@@ -1,11 +1,13 @@
 import os
 import signal
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, Mock
 from time import sleep
 
 import boto3
 from moto import mock_ec2
+# from moto.ec2 import ec2_backend
+from requests.exceptions import RequestException
 
 from config import CALC_TIME, DONE_TIME, VCPU_COUNT
 from startup import (
@@ -13,8 +15,7 @@ from startup import (
     calc_needed_instances, request_queue_len, get_queue_len)
 
 
-class TestGetQueueLen(unittest.TestCase):
-
+class TestRequestQueueLen(unittest.TestCase):
     @patch('startup.requests.get')
     def test_request_queue_len(self, mock_get):
         mock_get.return_value.json.return_value = {"count": 123}
@@ -22,6 +23,11 @@ class TestGetQueueLen(unittest.TestCase):
         response = request_queue_len()
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()['count'], 123)
+
+    @patch('startup.request_queue_len', side_effect=RequestException)
+    def test_request_exception(self, mock_request_queue_len):
+        with self.assertRaises(RequestException):
+            mock_request_queue_len()
 
 
 class TestCalcNeededInstances(unittest.TestCase):
@@ -41,17 +47,24 @@ class TestEC2CreateInstances(unittest.TestCase):
         self.assertTrue(all(is_instances))
 
 
+@mock_ec2
+class TestEC2TerminateInstances(unittest.TestCase):
+    def setUp(self):
+        self.ec2 = boto3.resource('ec2')
+        self.ec2.create_instances(
+            ImageId='ami-14fb1073', InstanceType='t2.micro',
+            MinCount=2, MaxCount=2)
+    
+    def test_terminate_instances(self):
+        instances = terminate_instances()
+        statuses = [i.state['Name'] == 'terminated'
+                    for i in self.ec2.instances.all()]
+        self.assertTrue(all(statuses))
+
+
+
 if __name__ == "__main__":
     unittest.main()
-
-# class TestEC2TerminateInstances(unittest.TestCase):
-#     def test_terminate_instances(self):
-#         ec2 = boto3.resource('ec2')
-#         instance = create_instances(1)[0]
-#         print(ec2.create_instances.call_count)
-        # terminate_instances()
-        # self.assertFalse(instance.state['Name'] == 'terminated')
-
 
 
 
@@ -60,20 +73,10 @@ if __name__ == "__main__":
 #     pass
     
 
-# class MockGracefulKiller(GracefulKiller):
-#     def __init__(self):
-#         signal.signal(signal.SIGALRM, self.exit_gracefully)
-#         super()
-
-
 # class TestGracefulKiller(unittest.TestCase):
-#     @patch('startup.GracefulKiller', side_effect=MockGracefulKiller)
+#     @patch('startup.GracefulKiller')
 #     def test_handle_signal(self, MockGracefulKiller):
 #         killer = MockGracefulKiller()
-#         signal.alarm(1)
-#         sleep(1.1)
-#         self.assertTrue(killer.kill_now)
-#         self.assertTrue(killer.exit_gracefully.assert_called_once())
 
 
 # class TestEC2CreateInstances(unittest.TestCase):
