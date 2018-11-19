@@ -14,6 +14,8 @@ from startup import (
     create_instances, terminate_instances, run, GracefulKiller, 
     calc_needed_instances, request_queue_len, get_queue_len)
 
+# TODO: более общие тесты
+
 
 class TestRequestQueueLen(unittest.TestCase):
     @patch('startup.requests.get')
