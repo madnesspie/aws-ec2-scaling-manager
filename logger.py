@@ -1,15 +1,16 @@
 import logging
 from functools import wraps
 
-logging.basicConfig(
-    format='%(asctime)s ~ %(levelname)-10s %(name)-25s %(message)s',
-    datefmt='%Y-%m-%d %H:%M', level=logging.DEBUG)  # , filename='*.log')
 
 DEBUG = logging.DEBUG
 INFO = logging.INFO
 WARNING = logging.WARNING
 ERROR = logging.ERROR
 CRITICAL = logging.CRITICAL
+
+logging.basicConfig(
+    format='%(asctime)s ~ %(levelname)-10s %(name)-25s %(message)s',
+    datefmt='%Y-%m-%d %H:%M', level=DEBUG)  # , filename='*.log')
 
 logging.getLogger('boto3').setLevel(WARNING)
 logging.getLogger('botocore').setLevel(WARNING)
@@ -32,14 +33,14 @@ def log(level=DEBUG, params=True, result=True):
 
         @wraps(func)
         def inner_wrapped(*args, **kwargs):
-            message = f"{func.__name__}() is called "
+            message = f"Calling {func.__name__} "
             if params:
-                message += f"with params {args} and {kwargs} "
+                message += f"with {args} and {kwargs} "
             logger.log(level, message)
 
             result = func(*args, **kwargs)
             if result:
-                message = f"{func.__name__}() returned {result} "
+                message = f"Return {func.__name__} equals {result} "
                 logger.log(level, message)
 
             return result

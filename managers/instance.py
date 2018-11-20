@@ -11,48 +11,45 @@ logger = get_logger(__name__)
 def dry_run(func):
     @wraps(func)
     def wrapped(*args, **kwargs):
-        """Do a dryrun first to verify permissions."""
+        """Do a dryrun to verify permissions."""
         try:
             return func(dry_run=True, *args, **kwargs)
         except ClientError as e:
             if 'DryRunOperation' in str(e):
                 return func(*args, **kwargs)
             else:
-                # If not permissions
+                logger.error(f"You don't have permission to {func.__name__}")
                 raise
     return wrapped
 
 
 class EC2InstanceManager:
-    def __init__(self, image_id, instance_type):
+    
+    TAG_NAME = 'Use'
+
+    def __init__(self, image_id, instance_type, instance_tag):
         self.image_id = image_id
         self.instance_type = instance_type
+        self.tag = {'Key': self.TAG_NAME, 'Value': instance_tag}
+        self.tag_filter = {'Name': f'tag:{self.TAG_NAME}',
+                           'Values': [instance_tag]}
         self.ec2 = boto3.resource('ec2')
+        logger.debug(
+            f"EC2InstanceManager created with {{image_id='{image_id}', "
+            f"instance_type='{instance_type}', instance_tag='{instance_tag}'}}")
 
-    def scale_to(self, count):
-        if count:
-            self.check(needed=count)
-        else:
-            self.terminate_instances()
+    @property
+    def instances(self):
+        return self.ec2.instances.filter(Filters=[self.tag_filter])
 
-    def check(self, needed):
-        """Checks if instances are needed."""
-        exist = len(list(self.ec2.instances.all()))
-        if needed > exist:
-            difference = needed - exist
-            self.create_instances(count=difference)
-        else:
-            # Если инстанстов больше/достаточно то мы ничего не делаем
-            logger.debug(f"Instances is enough")
+    @log()
+    def count_instances(self):
+        return len(list(self.instances))
 
-    @log(params=False)
+    @log()
     @dry_run
     def terminate_instances(self, dry_run=False):
-        """Terminate all instances"""
-        # https://aws.amazon.com/ru/ec2/faqs/#ec2fleet
-        # Возможно могут подойти группы инстансов
-        # TODO: Убивать только свои инстансы
-
+        """Terminate all instances."""
         # Плата за остановленный экземпляр не взимается
         # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/ec2.html#EC2.ServiceResource.stop
         # Плата взымается только за тома Elastic Block Storage
@@ -64,13 +61,14 @@ class EC2InstanceManager:
 
         # Судя по логам через ресурс убивается так-же одним запросом:
         # Calling ec2:terminate_instances with {'InstanceIds': ['i-0468292426afb2f2c', 'i-053584efb6c1ad5f0', 'i-066a03a0b02275a1a'], 'DryRun': False}
-        return self.ec2.instances.terminate(DryRun=dry_run)
+        return self.instances.terminate(DryRun=dry_run)
 
     @log()
     @dry_run
     def create_instances(self, count, dry_run=False):
         """Creates the required count of instances."""
         # TODO: Инстансы спотогого типа, посмотреть/применить
+        # TODO: лимитировать квотой аккаунта
 
         # https://aws.amazon.com/ru/ec2/faqs/#general
         # 'Вопрос. Сколько инстансов можно запускать в Amazon EC2?'
@@ -91,5 +89,11 @@ class EC2InstanceManager:
 
         instances = self.ec2.create_instances(
             ImageId=self.image_id, InstanceType=self.instance_type,
-            MinCount=count, MaxCount=count, DryRun=dry_run)
+            MinCount=count, MaxCount=count, DryRun=dry_run, 
+            TagSpecifications=[
+                {
+                    'ResourceType': 'instance',
+                    'Tags': [self.tag]
+                }]
+        )
         return instances

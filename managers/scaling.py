@@ -11,11 +11,14 @@ logger = get_logger(__name__)
 
 class EC2ScalingManager(EC2InstanceManager):
     def __init__(self, calc_time, done_time, vcpu_count,
-                 image_id, instance_type):
+                 image_id, instance_type, instance_tag):
         self.calc_time = calc_time
         self.done_time = done_time
         self.vcpu_count = vcpu_count
-        super().__init__(image_id, instance_type)
+        logger.debug(
+            f"EC2ScalingManager created with {{vcpu_count={vcpu_count}, "
+            f"done_time={done_time}, calc_time={calc_time}}}")
+        super().__init__(image_id, instance_type, instance_tag)
 
     def run(self):
         queue_len = self.get_queue_len()
@@ -41,3 +44,19 @@ class EC2ScalingManager(EC2InstanceManager):
         """Count no. of instances needed to complete a queue in done time."""
         needed = queue_len * self.calc_time / self.done_time / self.vcpu_count
         return ceil(needed)
+
+    def scale_to(self, count):
+        if count:
+            self.check(needed=count)
+        else:
+            self.terminate_instances()
+
+    def check(self, needed):
+        """Checks if instances are needed."""
+        exist = len(list(self.ec2.instances.all()))
+        if needed > exist:
+            difference = needed - exist
+            self.create_instances(count=difference)
+        else:
+            # Если инстанстов больше/достаточно то мы ничего не делаем
+            logger.debug(f"Instances is enough")
