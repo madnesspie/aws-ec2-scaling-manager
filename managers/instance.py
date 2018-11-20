@@ -18,8 +18,10 @@ def dry_run(func):
             if 'DryRunOperation' in str(e):
                 return func(*args, **kwargs)
             else:
+                # Нужно ли что-нибудь делать, если изменились настройки доступа?
                 logger.error(f"You don't have permission to {func.__name__}")
                 raise
+
     return wrapped
 
 
@@ -61,32 +63,30 @@ class EC2InstanceManager:
 
         # Судя по логам через ресурс убивается так-же одним запросом:
         # Calling ec2:terminate_instances with {'InstanceIds': ['i-0468292426afb2f2c', 'i-053584efb6c1ad5f0', 'i-066a03a0b02275a1a'], 'DryRun': False}
-        return self.instances.terminate(DryRun=dry_run)
+        terminated_instances = self.instances.terminate(DryRun=dry_run)
+        logger.info(f"Terminated {len(terminated_instances)} instances")
+        return terminated_instances
 
     @log()
     @dry_run
     def create_instances(self, count, dry_run=False):
         """Creates the required count of instances."""
         # TODO: Инстансы спотогого типа, посмотреть/применить
-        # TODO: лимитировать квотой аккаунта
+        # TODO: лимитировать квотой аккаунта ClientError (InstanceLimitExceeded)
 
         # https://aws.amazon.com/ru/ec2/faqs/#general
         # 'Вопрос. Сколько инстансов можно запускать в Amazon EC2?'
         # В этом вопросе указана квота аккаунта в 20 инстансов.
-        # Нужно масштабироваться вертикально?
-        # TODO: Попробовать создать 30 инстансов
-        # https://aws.amazon.com/ru/ec2/autoscaling/faqs/
-        # А здесь есть фраза "Тысяч инстансов" О_о
-
-        # Инстанс может выйти из строя, группы и автоскелинг в помощь
+        # Нужно масштабироваться вертикально? 
 
         # https://aws.amazon.com/contact-us/ec2-request/
         # Здесь можно запросить + к кол-ву инстансов для акк. ec2
 
+        # Инстанс может выйти из строя, группы и автоскелинг в помощь
+
         # https://aws.amazon.com/ru/ec2/faqs/#compute-optimized
         # Для вертикального могут подойти оптимизированные для вычислений
         # Микроинстансы тоже могут подойти
-
         instances = self.ec2.create_instances(
             ImageId=self.image_id, InstanceType=self.instance_type,
             MinCount=count, MaxCount=count, DryRun=dry_run, 
@@ -96,4 +96,5 @@ class EC2InstanceManager:
                     'Tags': [self.tag]
                 }]
         )
+        logger.info(f"Created {count} instances")
         return instances

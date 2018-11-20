@@ -34,9 +34,9 @@ def start():
             logger.debug(f"Pause {PAUSE} sec.")
             sleep(PAUSE)
     else:
-        # При SIGTERM'e убиваем инстансы? 
         manager.terminate_instances()
         logger.info(f"He lived without fear and died without fear!")
+        # При SIGTERM'e убиваем инстансы? 
 
 
 if __name__ == '__main__':
@@ -45,4 +45,5 @@ if __name__ == '__main__':
         calc_time=CALC_TIME, done_time=DONE_TIME,
         vcpu_count=VCPU_COUNT, image_id=IMAGE_ID,
         instance_type=INSTANCE_TYPE, instance_tag=INSTANCE_TAG)
-    manager.count_instances()
+    manager.create_instances(1)
+    manager.terminate_instances()

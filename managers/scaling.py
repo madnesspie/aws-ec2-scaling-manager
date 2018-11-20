@@ -20,9 +20,12 @@ class EC2ScalingManager(EC2InstanceManager):
             f"done_time={done_time}, calc_time={calc_time}}}")
         super().__init__(image_id, instance_type, instance_tag)
 
+    @log(result=False)
     def run(self):
         queue_len = self.get_queue_len()
         needed = self.calc_needed_instances(queue_len)
+        logger.info(f"{needed} instances required")
+
         self.scale_to(needed)
 
     @log(params=False)
@@ -32,7 +35,7 @@ class EC2ScalingManager(EC2InstanceManager):
 
     @staticmethod
     def request_queue_len():
-        """Request a number of backtest."""
+        """Request a qty. of tests."""
         try:
             return requests.get('https://pastebin.com/raw/bKdgMA3N')
         except RequestException:
@@ -45,18 +48,20 @@ class EC2ScalingManager(EC2InstanceManager):
         needed = queue_len * self.calc_time / self.done_time / self.vcpu_count
         return ceil(needed)
 
-    def scale_to(self, count):
-        if count:
-            self.check(needed=count)
+    @log(result=False)
+    def scale_to(self, n):
+        """Scale number of instances to n."""
+        if n:
+            diff = self.calc_diff(needed=n)
+            if diff:
+                self.create_instances(count=diff)
+            else:
+                logger.info(f"Instances is enough")
         else:
             self.terminate_instances()
 
-    def check(self, needed):
-        """Checks if instances are needed."""
-        exist = len(list(self.ec2.instances.all()))
-        if needed > exist:
-            difference = needed - exist
-            self.create_instances(count=difference)
-        else:
-            # Если инстанстов больше/достаточно то мы ничего не делаем
-            logger.debug(f"Instances is enough")
+    @log()
+    def calc_diff(self, needed):
+        """Counts number of instances to add."""
+        exist = self.count_instances()
+        return needed - exist
