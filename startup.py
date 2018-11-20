@@ -3,24 +3,24 @@ from traceback import format_exc
 
 from managers.scaling import EC2ScalingManager
 from gracefulkiller import GracefulKiller
+from settings import (
+    PAUSE, CALC_TIME, DONE_TIME, VCPU_COUNT, IMAGE_ID, INSTANCE_TYPE)
 from logger import log, get_logger
 
 logger = get_logger(__name__)
 
-# TODO: Инстансы спотогого типа, посмотреть/применить
-# TODO: Автоматический высчитывать экономику инстансов
-# TODO: Добавить документацию
+# TODO: Автоматический высчитывать экономику инстансов - судя по всему это труднаа
+# TODO: Получать no. vCPU из типа инстанса
 
-PAUSE = 45
 
 @log(result=False, params=False)
 def start():
     killer = GracefulKiller()
     manager = EC2ScalingManager(
-        calc_time=15, done_time=300, vcpu_count=2, 
-        image_id='ami-14fb1073', instance_type='t2.micro')
+        calc_time=CALC_TIME, done_time=DONE_TIME, vcpu_count=VCPU_COUNT,
+        image_id=IMAGE_ID, instance_type=INSTANCE_TYPE)
     # TODO: переменные окр.
-    
+
     while killer.pardoned:
         try:
             manager.run()
@@ -28,11 +28,10 @@ def start():
             logger.error(f"{format_exc()}")
         finally:
             sleep(PAUSE)
-
-    logger.critical(f"He lived without fear and died without fear!")
+    else:
+        # TODO: Kill instances
+        logger.info(f"He lived without fear and died without fear!")
 
 
 if __name__ == '__main__':
     start()
-
-

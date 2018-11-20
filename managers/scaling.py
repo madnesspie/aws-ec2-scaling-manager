@@ -10,12 +10,9 @@ logger = get_logger(__name__)
 
 
 class EC2ScalingManager(EC2InstanceManager):
-    def __init__(self, calc_time, done_time, vcpu_count, 
+    def __init__(self, calc_time, done_time, vcpu_count,
                  image_id, instance_type):
-        # CALC_TIME - Amazone AWS backtest calculation time in sec.
-        # DONE_TIME - Estimated time to complete all backtests in the queue
-        # VCPU_COUNT - No. of vCPU in t3.micro instance type
-        self.calc_time = calc_time 
+        self.calc_time = calc_time
         self.done_time = done_time
         self.vcpu_count = vcpu_count
         super().__init__(image_id, instance_type)
