@@ -1,7 +1,6 @@
 import logging
 from functools import wraps
 
-
 DEBUG = logging.DEBUG
 INFO = logging.INFO
 WARNING = logging.WARNING

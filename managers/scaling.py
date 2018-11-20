@@ -10,17 +10,17 @@ logger = get_logger(__name__)
 
 
 class EC2ScalingManager(EC2InstanceManager):
-    def __init__(self, calc_time, done_time, vcpu_count,
-                 image_id, instance_type, instance_tag):
+    def __init__(self, calc_time, done_time, vcpu_count, image_id, 
+                 instance_type, instance_tag, max_instances):
         self.calc_time = calc_time
         self.done_time = done_time
         self.vcpu_count = vcpu_count
         logger.debug(
             f"EC2ScalingManager created with {{vcpu_count={vcpu_count}, "
             f"done_time={done_time}, calc_time={calc_time}}}")
-        super().__init__(image_id, instance_type, instance_tag)
+        super().__init__(image_id, instance_type, instance_tag, max_instances)
 
-    @log(result=False)
+    @log(result=False, params=False)
     def run(self):
         queue_len = self.get_queue_len()
         needed = self.calc_needed_instances(queue_len)
@@ -35,7 +35,7 @@ class EC2ScalingManager(EC2InstanceManager):
 
     @staticmethod
     def request_queue_len():
-        """Request a qty. of tests."""
+        """Request a qty. of backtests."""
         try:
             return requests.get('https://pastebin.com/raw/bKdgMA3N')
         except RequestException:

@@ -29,40 +29,61 @@ class EC2InstanceManager:
     
     TAG_NAME = 'Use'
 
-    def __init__(self, image_id, instance_type, instance_tag):
+    def __init__(self, image_id, instance_type, instance_tag, max_instances):
+        self.ec2 = boto3.resource('ec2')
+        self.max_instances = self.get_max_instances(max_instances)
         self.image_id = image_id
         self.instance_type = instance_type
+        
         self.tag = {'Key': self.TAG_NAME, 'Value': instance_tag}
         self.tag_filter = {'Name': f'tag:{self.TAG_NAME}',
                            'Values': [instance_tag]}
-        self.ec2 = boto3.resource('ec2')
+        
         logger.debug(
             f"EC2InstanceManager created with {{image_id='{image_id}', "
-            f"instance_type='{instance_type}', instance_tag='{instance_tag}'}}")
+            f"instance_type='{instance_type}', instance_tag='{instance_tag}', "
+            f"max_instances={self.max_instances}}}")
+
+    @log()
+    def get_max_instances(self, n):
+        """Return maximum number of instances for the manager.
+        
+        If it is not specified by the user or is greater than the maximum
+        available for the account, then maximum number of instances for 
+        account is used.
+        """
+        account_max_instances = self.get_account_max_instances()
+        if n and n < account_max_instances:
+            return n
+        else:
+            return account_max_instances
+
+    @log(params=False)
+    def get_account_max_instances(self):
+        """Request maximum number of instances per account."""
+        response = self.ec2.meta.client.describe_account_attributes(
+            AttributeNames=['max-instances'])
+        attribute = response['AccountAttributes'][-1]
+        value = attribute['AttributeValues'][-1]
+        max_instances = int(value['AttributeValue'])
+        return max_instances
 
     @property
     def instances(self):
+        """Return instances created by manager."""
         return self.ec2.instances.filter(Filters=[self.tag_filter])
 
-    @log()
+    @log(params=False)
     def count_instances(self):
+        """Return number of instances created by the manager."""
         return len(list(self.instances))
 
-    @log()
+    @log(params=False)
     @dry_run
     def terminate_instances(self, dry_run=False):
-        """Terminate all instances."""
-        # Плата за остановленный экземпляр не взимается
-        # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/ec2.html#EC2.ServiceResource.stop
-        # Плата взымается только за тома Elastic Block Storage
-        # https://aws.amazon.com/ru/ec2/faqs/
-        # TODO: Останавливать, если это нужно
-
+        """Terminate instances created by manager."""
         # https://docs.aws.amazon.com/en_us/AWSEC2/latest/UserGuide/TroubleshootingInstancesShuttingDown.html
         # TODO: обработать ошибки остановки
-
-        # Судя по логам через ресурс убивается так-же одним запросом:
-        # Calling ec2:terminate_instances with {'InstanceIds': ['i-0468292426afb2f2c', 'i-053584efb6c1ad5f0', 'i-066a03a0b02275a1a'], 'DryRun': False}
         terminated_instances = self.instances.terminate(DryRun=dry_run)
         logger.info(f"Terminated {len(terminated_instances)} instances")
         return terminated_instances
@@ -70,23 +91,8 @@ class EC2InstanceManager:
     @log()
     @dry_run
     def create_instances(self, count, dry_run=False):
-        """Creates the required count of instances."""
-        # TODO: Инстансы спотогого типа, посмотреть/применить
-        # TODO: лимитировать квотой аккаунта ClientError (InstanceLimitExceeded)
-
-        # https://aws.amazon.com/ru/ec2/faqs/#general
-        # 'Вопрос. Сколько инстансов можно запускать в Amazon EC2?'
-        # В этом вопросе указана квота аккаунта в 20 инстансов.
-        # Нужно масштабироваться вертикально? 
-
-        # https://aws.amazon.com/contact-us/ec2-request/
-        # Здесь можно запросить + к кол-ву инстансов для акк. ec2
-
-        # Инстанс может выйти из строя, группы и автоскелинг в помощь
-
-        # https://aws.amazon.com/ru/ec2/faqs/#compute-optimized
-        # Для вертикального могут подойти оптимизированные для вычислений
-        # Микроинстансы тоже могут подойти
+        """Create the required count of instances.""" 
+        # TODO: Ловить ClientError (InstanceLimitExceeded)
         instances = self.ec2.create_instances(
             ImageId=self.image_id, InstanceType=self.instance_type,
             MinCount=count, MaxCount=count, DryRun=dry_run, 

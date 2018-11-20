@@ -7,6 +7,7 @@ VCPU_COUNT = easy_env.get_int('VCPU_COUNT', 2)
 IMAGE_ID = easy_env.get_str('IMAGE_ID', 'ami-14fb1073')
 INSTANCE_TYPE = easy_env.get_str('INSTANCE_TYPE', 't2.micro')
 INSTANCE_TAG = easy_env.get_str('INSTANCE_TAG', 'ForBacktests')
+MAX_INSTANCES = easy_env.get_int('MAX_INSTANCES', 0)
 
 # PAUSE = os.environ.get('PAUSE')
 # CALC_TIME = os.environ.get('CALC_TIME')
