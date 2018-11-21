@@ -47,14 +47,14 @@ def start():
         try:
             # manager.run()
             manager.terminate_instances()
-            # sleep(5)
-            # manager.create_instances(20)
-            # sleep(3)
-            # manager.terminate_instances()
-            # sleep(3)
-            # manager.create_instances(20)
-            # manager.count_instances()
-            # print(manager.instances)
+            return
+            manager.create_instances(4)
+            manager.count_instances_available()
+            sleep(3)
+            manager.terminate_instances()
+            manager.count_instances_available()
+            sleep(3)
+            manager.count_instances_available()
         except RequestException:
             logger.warning(f"Request for number of backtests failed!")
         except ClientError as e:

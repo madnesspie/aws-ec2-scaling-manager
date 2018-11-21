@@ -27,6 +27,10 @@ def dry_run(func):
 class EC2InstanceManager:
     
     TAG_NAME = 'Use'
+    NOT_TERMINATED_FILTER = {
+        'Name': 'instance-state-name',
+        'Values': ['pending', 'running', 'shutting-down', 'stopping', 'stopped']
+    }
 
     def __init__(self, image_id, instance_type, instance_tag, max_instances):
         self.ec2 = boto3.resource('ec2')
@@ -70,30 +74,52 @@ class EC2InstanceManager:
     @property
     def instances(self):
         """Return instances created by manager."""
-        return self.ec2.instances.filter(Filters=[self.tag_filter])
-
+        return self.ec2.instances.filter(
+            Filters=[self.tag_filter, self.NOT_TERMINATED_FILTER]) 
+    
     @log(params=False)
     def count_instances(self):
         """Return number of instances created by the manager."""
         return len(list(self.instances))
+    
+    @log(params=False)
+    def count_instances_available(self):
+        """Return number of instances available for creation."""
+        return self.max_instances - self.count_instances()
 
     @log(params=False)
     @dry_run
     def terminate_instances(self, dry_run=False):
         """Terminate instances created by manager."""
         # https://docs.aws.amazon.com/en_us/AWSEC2/latest/UserGuide/TroubleshootingInstancesShuttingDown.html
-        # TODO: обработать ошибки остановки
-        terminated_instances = self.instances.terminate(DryRun=dry_run)
+        # TODO: обработать ошибки остановки 
+        response = self.instances.terminate(DryRun=dry_run)
+        if response:
+            terminated_instances = response[0]['TerminatingInstances']
+        else: 
+            # The response == [] if no instances were terminated
+            terminated_instances = []
+
         logger.info(f"Terminated {len(terminated_instances)} instances")
         return terminated_instances
 
     @log()
     @dry_run
     def create_instances(self, count, dry_run=False):
-        """Create the required count of instances.""" 
-        # TODO: Ловить ClientError (InstanceLimitExceeded)
+        """Create the required count of instances.
+        
+        If the specified number of instances exceeds the maximum available, 
+        then a maximum of instances will be launched.
+        """ 
+        if count > self.max_instances:
+            if not dry_run:
+                logger.warning(
+                    f"Unable to create {count} instances, "
+                    f"{self.max_instances} will create")
+            count = self.max_instances
+        
         try:
-            instances = self.ec2.create_instances(
+            created_instances = self.ec2.create_instances(
                 ImageId=self.image_id, InstanceType=self.instance_type,
                 MinCount=count, MaxCount=count, DryRun=dry_run,
                 TagSpecifications=[
@@ -105,8 +131,8 @@ class EC2InstanceManager:
         except ClientError as e:
             if 'InstanceLimitExceeded' in str(e):
                 logger.warning(f"Instance limit was exceeded!")
-            if 'DryRunOperation' in str(e):
+            else:
                 raise
         else:
-            logger.info(f"Created {count} instances")
-            return instances
+            logger.info(f"Created {len(created_instances)} instances")
+            return created_instances
