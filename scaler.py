@@ -23,14 +23,15 @@ logger = get_logger(__name__)
 # Микроинстансы тоже могут подойти
 
 
-# Если нужно:
+# Мб позже:
 # TODO: Автоматический высчитывать экономику инстансов
 # TODO: Получать no. vCPU из типа инстанса (хз можно ли)
+# TODO: Добавить остановку инстансов
 # TODO: Документация
 
 # Обязательно:
-# TODO: Инстансы спотогого типа, посмотреть/применить
-# TODO: Добавить остановку инстансов
+# TODO: Добавить кол-во доступных инстансов
+# TODO: Инстансы спотогого типа применить
 # TODO: Тесты
 
 
@@ -44,8 +45,16 @@ def start():
 
     while killer.pardoned:
         try:
-            manager.run()
+            # manager.run()
+            manager.terminate_instances()
+            # sleep(5)
+            # manager.create_instances(20)
+            # sleep(3)
             # manager.terminate_instances()
+            # sleep(3)
+            # manager.create_instances(20)
+            # manager.count_instances()
+            # print(manager.instances)
         except RequestException:
             logger.warning(f"Request for number of backtests failed!")
         except ClientError as e:
