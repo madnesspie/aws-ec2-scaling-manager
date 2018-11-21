@@ -18,8 +18,7 @@ def dry_run(func):
             if 'DryRunOperation' in str(e):
                 return func(*args, **kwargs)
             else:
-                # Нужно ли что-нибудь делать, если изменились настройки доступа?
-                logger.error(f"You don't have permission to {func.__name__}")
+                logger.error(f"You don't have permission to {func.__name__}!")
                 raise
 
     return wrapped
@@ -93,14 +92,21 @@ class EC2InstanceManager:
     def create_instances(self, count, dry_run=False):
         """Create the required count of instances.""" 
         # TODO: Ловить ClientError (InstanceLimitExceeded)
-        instances = self.ec2.create_instances(
-            ImageId=self.image_id, InstanceType=self.instance_type,
-            MinCount=count, MaxCount=count, DryRun=dry_run, 
-            TagSpecifications=[
-                {
-                    'ResourceType': 'instance',
-                    'Tags': [self.tag]
-                }]
-        )
-        logger.info(f"Created {count} instances")
-        return instances
+        try:
+            instances = self.ec2.create_instances(
+                ImageId=self.image_id, InstanceType=self.instance_type,
+                MinCount=count, MaxCount=count, DryRun=dry_run,
+                TagSpecifications=[
+                    {
+                        'ResourceType': 'instance',
+                        'Tags': [self.tag]
+                    }]
+            )
+        except ClientError as e:
+            if 'InstanceLimitExceeded' in str(e):
+                logger.warning(f"Instance limit was exceeded!")
+            if 'DryRunOperation' in str(e):
+                raise
+        else:
+            logger.info(f"Created {count} instances")
+            return instances

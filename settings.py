@@ -1,6 +1,6 @@
 import easy_env
  
-PAUSE = easy_env.get_int('PAUSE', 30)
+PAUSE = easy_env.get_int('PAUSE', 10)
 CALC_TIME = easy_env.get_int('CALC_TIME', 15)
 DONE_TIME = easy_env.get_int('DONE_TIME', 300)
 VCPU_COUNT = easy_env.get_int('VCPU_COUNT', 2)

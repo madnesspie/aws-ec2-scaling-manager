@@ -1,6 +1,9 @@
 from time import sleep
 from traceback import format_exc
 
+from requests.exceptions import RequestException
+from botocore.exceptions import ClientError
+
 from managers.scaling import EC2ScalingManager
 from gracefulkiller import GracefulKiller
 from settings import (
@@ -26,8 +29,8 @@ logger = get_logger(__name__)
 # TODO: Документация
 
 # Обязательно:
-# TODO: Добавить остановку инстансов
 # TODO: Инстансы спотогого типа, посмотреть/применить
+# TODO: Добавить остановку инстансов
 # TODO: Тесты
 
 
@@ -42,17 +45,24 @@ def start():
     while killer.pardoned:
         try:
             manager.run()
+            # manager.terminate_instances()
+        except RequestException:
+            logger.warning(f"Request for number of backtests failed!")
+        except ClientError as e:
+            logger.critical(f"Critical client error: {e}")
+            break
         except BaseException:
-            logger.error(f"{format_exc()}")
-            # TODO: Падение с ошибкой если нет прав доступа
-            # break
+            # Что делать если необработанная ошибка? 
+            logger.critical(f"Critical unhandled error:\n{format_exc()}")
+            break
         finally:
             logger.debug(f"Pause {PAUSE} sec.")
             sleep(PAUSE)
     else:
         manager.terminate_instances()
-        logger.info(f"He lived without fear and died without fear!")
+        logger.info(f"Caught signal SIGTERM. Program correctly stopped")
 
+    logger.critical("The error caused the program to stop!")
 
 if __name__ == '__main__':
     start()

@@ -39,7 +39,6 @@ class EC2ScalingManager(EC2InstanceManager):
         try:
             return requests.get('https://pastebin.com/raw/bKdgMA3N')
         except RequestException:
-            logger.warning(f"Request for number of backtests failed!")
             raise
 
     @log()
