@@ -37,11 +37,11 @@ def log(level=DEBUG, params=True, result=True):
                 message += f"with {args} and {kwargs} "
             logger.log(level, message)
 
-            result = func(*args, **kwargs)
+            func_result = func(*args, **kwargs)
             if result:
-                message = f"Return {func.__name__} equals {result} "
+                message = f"Return {func.__name__} equals {func_result} "
                 logger.log(level, message)
 
-            return result
+            return func_result
         return inner_wrapped
     return wrapped

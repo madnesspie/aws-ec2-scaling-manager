@@ -18,9 +18,7 @@ def dry_run(func):
             if 'DryRunOperation' in str(e):
                 return func(*args, **kwargs)
             else:
-                logger.error(f"You don't have permission to {func.__name__}!")
                 raise
-
     return wrapped
 
 
@@ -34,7 +32,7 @@ class EC2InstanceManager:
 
     def __init__(self, image_id, instance_type, instance_tag, max_instances):
         self.ec2 = boto3.resource('ec2')
-        self.max_instances = self.get_max_instances(max_instances)
+        self.account_max_instances = self.get_account_max_instances()
         self.image_id = image_id
         self.instance_type = instance_type
         
@@ -44,23 +42,27 @@ class EC2InstanceManager:
         
         logger.debug(
             f"EC2InstanceManager created with {{image_id='{image_id}', "
-            f"instance_type='{instance_type}', instance_tag='{instance_tag}', "
-            f"max_instances={self.max_instances}}}")
+            f"instance_type='{instance_type}', instance_tag='{instance_tag}'}}")
 
-    @log()
-    def get_max_instances(self, n):
-        """Return maximum number of instances for the manager.
+    @property
+    def instances(self):
+        """Return instances created by manager.
         
-        If it is not specified by the user or is greater than the maximum
-        available for the account, then maximum number of instances for 
-        account is used.
+        No need to receive terminated instances. It do not affect quota.
         """
-        account_max_instances = self.get_account_max_instances()
-        if n and n < account_max_instances:
-            return n
-        else:
-            return account_max_instances
+        return self.ec2.instances.filter(
+            Filters=[self.tag_filter, self.NOT_TERMINATED_FILTER]) 
+    
+    @property
+    def count_instances(self):
+        """Return number of not terminated instances created by the manager."""
+        return len(list(self.instances))
 
+    @property
+    def account_quota(self):
+        """Return number of instances available account to creation now."""
+        return self.account_max_instances - self.count_instances
+    
     @log(params=False)
     def get_account_max_instances(self):
         """Request maximum number of instances per account."""
@@ -71,37 +73,19 @@ class EC2InstanceManager:
         max_instances = int(value['AttributeValue'])
         return max_instances
 
-    @property
-    def instances(self):
-        """Return instances created by manager."""
-        return self.ec2.instances.filter(
-            Filters=[self.tag_filter, self.NOT_TERMINATED_FILTER]) 
-    
-    @log(params=False)
-    def count_instances(self):
-        """Return number of instances created by the manager."""
-        return len(list(self.instances))
-    
-    @log(params=False)
-    def count_instances_available(self):
-        """Return number of instances available for creation."""
-        return self.max_instances - self.count_instances()
-
     @log(params=False)
     @dry_run
     def terminate_instances(self, dry_run=False):
         """Terminate instances created by manager."""
         # https://docs.aws.amazon.com/en_us/AWSEC2/latest/UserGuide/TroubleshootingInstancesShuttingDown.html
         # TODO: обработать ошибки остановки 
-        response = self.instances.terminate(DryRun=dry_run)
-        if response:
-            terminated_instances = response[0]['TerminatingInstances']
-        else: 
-            # The response == [] if no instances were terminated
-            terminated_instances = []
+        terminated = self.instances.terminate(DryRun=dry_run)
+        if terminated:
+            # The terminated == [] if no instances were terminated
+            terminated = terminated[0]['TerminatingInstances']
 
-        logger.info(f"Terminated {len(terminated_instances)} instances")
-        return terminated_instances
+        logger.info(f"Terminated {len(terminated)} instances")
+        return terminated
 
     @log()
     @dry_run
@@ -111,13 +95,6 @@ class EC2InstanceManager:
         If the specified number of instances exceeds the maximum available, 
         then a maximum of instances will be launched.
         """ 
-        if count > self.max_instances:
-            if not dry_run:
-                logger.warning(
-                    f"Unable to create {count} instances, "
-                    f"{self.max_instances} will create")
-            count = self.max_instances
-        
         try:
             created_instances = self.ec2.create_instances(
                 ImageId=self.image_id, InstanceType=self.instance_type,

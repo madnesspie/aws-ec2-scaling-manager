@@ -12,13 +12,34 @@ logger = get_logger(__name__)
 class EC2ScalingManager(EC2InstanceManager):
     def __init__(self, calc_time, done_time, vcpu_count, image_id, 
                  instance_type, instance_tag, max_instances):
+        super().__init__(image_id, instance_type, instance_tag, max_instances)
         self.calc_time = calc_time
         self.done_time = done_time
         self.vcpu_count = vcpu_count
+        self.max_instances = self.check_max_instances(max_instances)
         logger.debug(
             f"EC2ScalingManager created with {{vcpu_count={vcpu_count}, "
-            f"done_time={done_time}, calc_time={calc_time}}}")
-        super().__init__(image_id, instance_type, instance_tag, max_instances)
+            f"done_time={done_time}, calc_time={calc_time}, "
+            f"max_instances={self.max_instances}}}")
+
+    @property
+    def quota(self):
+        """Return number of instances available manager to creation now."""
+        return self.max_instances - self.count_instances
+
+    @log()
+    def check_max_instances(self, n):
+        """Return maximum number of instances for the manager.
+        
+        If it is not specified by the user or is greater than the maximum
+        available for the account, then maximum number of instances for 
+        account is used.
+        """
+        account_max_instances = self.get_account_max_instances()
+        if n and n < account_max_instances:
+            return n
+        else:
+            return account_max_instances
 
     @log(result=False, params=False)
     def run(self):
@@ -52,8 +73,10 @@ class EC2ScalingManager(EC2InstanceManager):
         """Scale number of instances to n."""
         if n:
             diff = self.calc_diff(needed=n)
-            if diff:
-                self.create_instances(count=diff)
+            if diff > 0:
+                count = self.limit_by_quota(diff)
+                if count:
+                    self.create_instances(count)
             else:
                 logger.info(f"Instances is enough")
         else:
@@ -61,6 +84,16 @@ class EC2ScalingManager(EC2InstanceManager):
 
     @log()
     def calc_diff(self, needed):
-        """Counts number of instances to add."""
-        exist = self.count_instances()
+        """Count number of instances to add."""
+        exist = self.count_instances
         return needed - exist
+
+    @log()
+    def limit_by_quota(self, count):
+        """Limit number of instances to create."""
+        if count > self.quota:
+            logger.warning(
+                f"Quota limit. Unable to create {count} instances, "
+                f"{self.quota} will create")
+            count = self.quota
+        return count
