@@ -30,8 +30,8 @@ class EC2InstanceManager:
         'Values': ['pending', 'running', 'shutting-down', 'stopping', 'stopped']
     }
 
-    def __init__(self, image_id, instance_type, instance_tag, max_instances):
-        self.ec2 = boto3.resource('ec2')
+    def __init__(self, image_id, instance_type, instance_tag, region_name):
+        self.ec2 = boto3.resource('ec2', region_name=region_name)
         self.account_max_instances = self.get_account_max_instances()
         self.image_id = image_id
         self.instance_type = instance_type
@@ -99,11 +99,18 @@ class EC2InstanceManager:
             created_instances = self.ec2.create_instances(
                 ImageId=self.image_id, InstanceType=self.instance_type,
                 MinCount=count, MaxCount=count, DryRun=dry_run,
-                TagSpecifications=[
-                    {
-                        'ResourceType': 'instance',
-                        'Tags': [self.tag]
-                    }]
+                TagSpecifications=[{
+                    'ResourceType': 'instance',
+                    'Tags': [self.tag]}
+                ],
+                InstanceMarketOptions={'MarketType': 'spot'}
+                #     ,
+                #     # 'SpotOptions': {
+                #     #     'MaxPrice': 'string',
+                #     #     'SpotInstanceType': 'one-time'  | 'persistent',
+                #     #     'BlockDurationMinutes': 123,
+                #     #     'InstanceInterruptionBehavior': 'hibernate' | 'stop' | 'terminate'}
+                # },
             )
         except ClientError as e:
             if 'InstanceLimitExceeded' in str(e):
@@ -113,3 +120,14 @@ class EC2InstanceManager:
         else:
             logger.info(f"Created {len(created_instances)} instances")
             return created_instances
+
+    @log()
+    def create_spot_instances(self):
+        response = self.ec2.meta.client.request_spot_instances(
+            LaunchSpecification={
+                'ImageId': self.image_id,
+                'InstanceType': self.instance_type
+            },
+            InstanceCount=1,
+        )
+        return response

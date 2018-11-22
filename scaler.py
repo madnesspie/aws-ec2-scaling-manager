@@ -30,7 +30,6 @@ logger = get_logger(__name__)
 # TODO: Документация
 
 # Обязательно:
-# TODO: Добавить кол-во доступных инстансов
 # TODO: Инстансы спотогого типа применить
 # TODO: Тесты
 
@@ -46,15 +45,9 @@ def start():
     while killer.pardoned:
         try:
             # manager.run()
-            manager.terminate_instances()
-            return
-            manager.create_instances(4)
-            manager.count_instances_available()
-            sleep(3)
-            manager.terminate_instances()
-            manager.count_instances_available()
-            sleep(3)
-            manager.count_instances_available()
+            # manager.terminate_instances()
+            # manager.create_instances(6)
+            manager.create_spot_instances()
         except RequestException:
             logger.warning(f"Request for number of backtests failed!")
         except ClientError as e:
@@ -65,6 +58,7 @@ def start():
             logger.critical(f"Critical unhandled error:\n{format_exc()}")
             break
         finally:
+            return
             logger.debug(f"Pause {PAUSE} sec.")
             sleep(PAUSE)
     else:
