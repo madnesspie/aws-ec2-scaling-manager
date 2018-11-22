@@ -75,7 +75,7 @@ class EC2ScalingManager(EC2InstanceManager):
             diff = self.calc_diff(needed=n)
             if diff > 0:
                 count = self.limit_by_quota(diff)
-                if count:
+                for count in self.split_up(count):
                     self.create_instances(count)
             else:
                 logger.info(f"Instances is enough")
@@ -97,3 +97,14 @@ class EC2ScalingManager(EC2InstanceManager):
                 f"{self.quota} will create")
             count = self.quota
         return count
+
+    @staticmethod
+    @log()
+    def split_up(count):
+        """Split up large requests into smaller batches if 50 instances.
+        
+        It nedded to ensure faster instance launches.
+        """
+        full, partial = divmod(count, 50)
+        counts = [50] * full + [partial]
+        return counts
