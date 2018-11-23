@@ -17,7 +17,6 @@ from settings import (
 
 # TODO: Создание инстансов при > очереди
 # TODO: Удаление инстансов при 0 очереди
-# TODO: 2 инстанса программы 
 
 
 def create_scaling_manager(max_instances=MAX_INSTANCES):
@@ -58,6 +57,30 @@ class TestRequestQueueLen(unittest.TestCase):
 
 
 @mock_ec2
+class TestEC2ScalingManagerRun(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.manager = create_scaling_manager()
+
+    @patch('managers.scaling.requests.get')
+    def test_create_instances_if_queue(self, mock_get):
+        # Приходится мокать get(), т.к. с @mock_ec2 метод падает с ошибкой
+        mock_get.return_value.json.return_value = {"count": 1}
+        self.manager.run()
+        self.assertTrue(self.manager.count_instances)
+
+    @patch('managers.scaling.requests.get')
+    def test_terminate_instances_if_not_queue(self, mock_get):
+        mock_get.return_value.json.return_value = {"count": 0}
+        self.manager.run()
+        self.assertFalse(self.manager.count_instances)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.manager.terminate_instances()
+
+
+@mock_ec2
 class TestEC2CreateInstancesLimits(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -66,7 +89,6 @@ class TestEC2CreateInstancesLimits(unittest.TestCase):
 
     @patch('managers.scaling.requests.get')
     def test_create_instances_limit(self, mock_get):
-        # Приходится мокать get(), т.к. с @mock_ec2 метод падает с ошибкой
         mock_get.return_value.json.return_value = {"count": 9999999}
         self.manager.run()
         self.assertEqual(self.manager.count_instances, self.max_instances)
@@ -118,31 +140,3 @@ class TestTwoEC2InstanceManagers(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
-
-
-
-# class TestRun(unittest.TestCase):
-#     pass
-    
-
-# class TestGracefulKiller(unittest.TestCase):
-#     @patch('startup.GracefulKiller')
-#     def test_handle_signal(self, MockGracefulKiller):
-#         killer = MockGracefulKiller()
-
-
-# class TestEC2CreateInstances(unittest.TestCase):
-
-#     def tearDown(self):
-#         ec2.instances.filter(InstanceIds=self.instance_ids).terminate()
-
-#     def test_instances_list_returned(self):
-#         instanses = create_instances(count=1)
-#         self.instance_ids = [i.id for i in instanses]
-#         self.assertTrue(all([i for i in instanses]))
-
-
-
-# class TestCalc(unittest.TestCase):
-#     pass
