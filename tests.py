@@ -29,6 +29,14 @@ def create_scaling_manager(max_instances=MAX_INSTANCES):
     return manager
 
 
+def create_instance_manager(instance_tag=INSTANCE_TAG):
+    manager = EC2InstanceManager(
+        image_id=IMAGE_ID, instance_type=INSTANCE_TYPE,
+        instance_tag=instance_tag, region_name=REGION_NAME,
+        spot_market=SPOT_MARKET)
+    return manager
+
+
 class TestRequestQueueLen(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -61,7 +69,7 @@ class TestEC2CreateInstancesLimits(unittest.TestCase):
         # Приходится мокать get(), т.к. с @mock_ec2 метод падает с ошибкой
         mock_get.return_value.json.return_value = {"count": 9999999}
         self.manager.run()
-        self.assertTrue(self.manager.count_instances == self.max_instances)
+        self.assertEqual(self.manager.count_instances, self.max_instances)
 
     @patch('managers.scaling.EC2ScalingManager.quota', 
            new_callable=PropertyMock)
@@ -76,20 +84,36 @@ class TestEC2CreateInstancesLimits(unittest.TestCase):
         self.manager.terminate_instances()
 
 
-# @mock_ec2
-# class TestEC2TerminateInstances(unittest.TestCase):
-#     def setUp(self):
-#         self.ec2 = boto3.resource('ec2')
-#         self.ec2.create_instances(
-#             ImageId='ami-14fb1073', InstanceType='t2.micro',
-#             MinCount=2, MaxCount=2)
-    
-#     def test_terminate_instances(self):
-#         instances = terminate_instances()
-#         statuses = [i.state['Name'] == 'terminated'
-#                     for i in self.ec2.instances.all()]
-#         self.assertTrue(all(statuses))
+@mock_ec2
+class TestTwoEC2InstanceManagers(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.first_count = 2
+        cls.second_count = 3
+        cls.first_manager = create_instance_manager(instance_tag='test1')
+        cls.second_manager = create_instance_manager(instance_tag='test2')
+        
+    def setUp(self):
+        self.first_manager.create_instances(self.first_count)
+        self.second_manager.create_instances(self.second_count)
 
+    def test_creation(self):
+        self.assertEqual(self.first_manager.count_instances, self.first_count)
+        self.assertEqual(self.second_manager.count_instances, self.second_count)
+
+    def test_terminate_instances_of_first(self):
+        self.first_manager.terminate_instances()
+        self.assertFalse(self.first_manager.count_instances)
+        self.assertEqual(self.second_manager.count_instances, self.second_count)
+
+    def test_terminate_instances_of_second(self):
+        self.second_manager.terminate_instances()
+        self.assertFalse(self.second_manager.count_instances)
+        self.assertEqual(self.first_manager.count_instances, self.first_count)
+
+    def tearDown(self):
+        self.first_manager.terminate_instances()
+        self.second_manager.terminate_instances()
 
 
 if __name__ == "__main__":

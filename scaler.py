@@ -44,7 +44,7 @@ def start():
 
     while killer.pardoned:
         try:
-            manager.terminate_instances()
+            manager.run()
         except RequestException:
             logger.warning(f"Request for number of backtests failed!")
         except ClientError as e:
