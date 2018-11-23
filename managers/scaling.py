@@ -11,8 +11,10 @@ logger = get_logger(__name__)
 
 class EC2ScalingManager(EC2InstanceManager):
     def __init__(self, calc_time, done_time, vcpu_count, image_id, 
-                 instance_type, instance_tag, max_instances, region_name):
-        super().__init__(image_id, instance_type, instance_tag, region_name)
+                 instance_type, instance_tag, max_instances, region_name, 
+                 spot_market):
+        super().__init__(
+            image_id, instance_type, instance_tag, region_name, spot_market)
         self.calc_time = calc_time
         self.done_time = done_time
         self.vcpu_count = vcpu_count

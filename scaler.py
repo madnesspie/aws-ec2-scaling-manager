@@ -7,8 +7,8 @@ from botocore.exceptions import ClientError
 from managers.scaling import EC2ScalingManager
 from gracefulkiller import GracefulKiller
 from settings import (
-    PAUSE, CALC_TIME, DONE_TIME, VCPU_COUNT, IMAGE_ID, 
-    INSTANCE_TYPE, INSTANCE_TAG, MAX_INSTANCES)
+    PAUSE, CALC_TIME, DONE_TIME, VCPU_COUNT, IMAGE_ID, INSTANCE_TYPE, 
+    INSTANCE_TAG, MAX_INSTANCES, REGION_NAME, SPOT_MARKET)
 from logger import log, get_logger
 
 logger = get_logger(__name__)
@@ -25,12 +25,12 @@ logger = get_logger(__name__)
 
 # Мб позже:
 # TODO: Автоматический высчитывать экономику инстансов
-# TODO: Получать no. vCPU из типа инстанса (хз можно ли)
-# TODO: Добавить остановку инстансов
+# TODO: Получать no. vCPU из типа иstrстанса (хз можно ли)
+# TODO: Добавить остановку инстансоstr
 # TODO: Документация
 
 # Обязательно:
-# TODO: Инстансы спотогого типа применить
+# TODO: Инстансы спотогого типа приstrенить
 # TODO: Тесты
 
 
@@ -40,14 +40,13 @@ def start():
     manager = EC2ScalingManager(
         calc_time=CALC_TIME, done_time=DONE_TIME, vcpu_count=VCPU_COUNT, 
         image_id=IMAGE_ID, instance_type=INSTANCE_TYPE, 
-        instance_tag=INSTANCE_TAG, max_instances=MAX_INSTANCES)
+        instance_tag=INSTANCE_TAG, max_instances=MAX_INSTANCES,
+        region_name=REGION_NAME, spot_market=SPOT_MARKET)
 
     while killer.pardoned:
         try:
-            # manager.run()
-            # manager.terminate_instances()
-            # manager.create_instances(6)
-            manager.create_spot_instances()
+            manager.run()
+            # manager.create_instances(1)
         except RequestException:
             logger.warning(f"Request for number of backtests failed!")
         except ClientError as e:
@@ -58,7 +57,6 @@ def start():
             logger.critical(f"Critical unhandled error:\n{format_exc()}")
             break
         finally:
-            return
             logger.debug(f"Pause {PAUSE} sec.")
             sleep(PAUSE)
     else:
