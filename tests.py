@@ -10,33 +10,57 @@ from moto import mock_ec2
 from requests.exceptions import RequestException
 
 from managers.instance import EC2InstanceManager
+from managers.scaling import EC2ScalingManager
 from settings import (
-    PAUSE, CALC_TIME, DONE_TIME, VCPU_COUNT, IMAGE_ID,
-    INSTANCE_TYPE, INSTANCE_TAG, MAX_INSTANCES)
+    PAUSE, CALC_TIME, DONE_TIME, VCPU_COUNT, IMAGE_ID, INSTANCE_TYPE,
+    INSTANCE_TAG, MAX_INSTANCES, REGION_NAME, SPOT_MARKET)
+
+# TODO: Создание инстансов при > очереди
+# TODO: Удаление инстансов при 0 очереди
+# TODO: 2 инстанса программы 
 
 
-@mock_ec2
-class TestEC2CreateInstances(unittest.TestCase):
-    def test_create_instances(self):
-        manager = EC2InstanceManager( 
-            image_id=IMAGE_ID, instance_type=INSTANCE_TYPE,
-            instance_tag=INSTANCE_TAG)
-        r = manager.create_instances(1)
-        self.assertTrue(r)
+def create_scalling_manager():
+    manager = EC2ScalingManager(
+        calc_time=CALC_TIME, done_time=DONE_TIME, vcpu_count=VCPU_COUNT,
+        image_id=IMAGE_ID, instance_type=INSTANCE_TYPE,
+        instance_tag=INSTANCE_TAG, max_instances=MAX_INSTANCES,
+        region_name=REGION_NAME, spot_market=SPOT_MARKET)
+    return manager
 
-# class TestRequestQueueLen(unittest.TestCase):
-#     @patch('startup.requests.get')
-#     def test_request_queue_len(self, mock_get):
-#         mock_get.return_value.json.return_value = {"count": 123}
-#         mock_get.return_value.status_code = 200
-#         response = request_queue_len()
-#         self.assertEqual(response.status_code, 200)
-#         self.assertEqual(response.json()['count'], 123)
 
-#     @patch('startup.request_queue_len', side_effect=RequestException)
-#     def test_request_exception(self, mock_request_queue_len):
-#         with self.assertRaises(RequestException):
-#             mock_request_queue_len()
+class TestRequestQueueLen(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.manager = create_scalling_manager()
+
+    @patch('managers.scaling.requests.get')
+    def test_request_queue_len(self, mock_get):
+        mock_get.return_value.json.return_value = {"count": 123}
+        mock_get.return_value.status_code = 200
+        response = self.manager.request_queue_len()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['count'], 123)
+
+    @patch('managers.scaling.EC2ScalingManager.request_queue_len', 
+           side_effect=RequestException)
+    def test_request_exception(self, mock_request_queue_len):
+        with self.assertRaises(RequestException):
+            self.manager.run()
+
+
+# @mock_ec2
+# class TestEC2CreateInstances(unittest.TestCase):
+#     @classmethod
+#     def setUpClass(cls):
+#         cls.manager = create_scalling_manager()
+
+#     def test_create_instances(self):
+#         r = manager.create_instances(1)
+#         self.assertTrue(r)
+
+#     def tearDown(self):
+#         self.manager.terminate_instances()
 
 
 # @mock_ec2
