@@ -83,8 +83,6 @@ class EC2InstanceManager:
     @dry_run
     def terminate_instances(self, dry_run=False):
         """Terminate instances created by manager."""
-        # https://docs.aws.amazon.com/en_us/AWSEC2/latest/UserGuide/TroubleshootingInstancesShuttingDown.html
-        # TODO: обработать ошибки остановки 
         terminated = self.instances.terminate(DryRun=dry_run)
         if terminated:
             # The terminated == [] if no instances were terminated

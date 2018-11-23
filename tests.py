@@ -1,7 +1,7 @@
 import os
 import signal
 import unittest
-from unittest.mock import patch, Mock
+from unittest.mock import patch, Mock, PropertyMock
 from time import sleep
 
 import boto3
@@ -20,11 +20,11 @@ from settings import (
 # TODO: 2 инстанса программы 
 
 
-def create_scalling_manager():
+def create_scaling_manager(max_instances=MAX_INSTANCES):
     manager = EC2ScalingManager(
         calc_time=CALC_TIME, done_time=DONE_TIME, vcpu_count=VCPU_COUNT,
         image_id=IMAGE_ID, instance_type=INSTANCE_TYPE,
-        instance_tag=INSTANCE_TAG, max_instances=MAX_INSTANCES,
+        instance_tag=INSTANCE_TAG, max_instances=max_instances,
         region_name=REGION_NAME, spot_market=SPOT_MARKET)
     return manager
 
@@ -32,7 +32,7 @@ def create_scalling_manager():
 class TestRequestQueueLen(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.manager = create_scalling_manager()
+        cls.manager = create_scaling_manager()
 
     @patch('managers.scaling.requests.get')
     def test_request_queue_len(self, mock_get):
@@ -49,18 +49,31 @@ class TestRequestQueueLen(unittest.TestCase):
             self.manager.run()
 
 
-# @mock_ec2
-# class TestEC2CreateInstances(unittest.TestCase):
-#     @classmethod
-#     def setUpClass(cls):
-#         cls.manager = create_scalling_manager()
+@mock_ec2
+class TestEC2CreateInstancesLimits(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.max_instances = 3
+        cls.manager = create_scaling_manager(max_instances=cls.max_instances)
 
-#     def test_create_instances(self):
-#         r = manager.create_instances(1)
-#         self.assertTrue(r)
+    @patch('managers.scaling.requests.get')
+    def test_create_instances_limit(self, mock_get):
+        # Приходится мокать get(), т.к. с @mock_ec2 метод падает с ошибкой
+        mock_get.return_value.json.return_value = {"count": 9999999}
+        self.manager.run()
+        self.assertTrue(self.manager.count_instances == self.max_instances)
 
-#     def tearDown(self):
-#         self.manager.terminate_instances()
+    @patch('managers.scaling.EC2ScalingManager.quota', 
+           new_callable=PropertyMock)
+    @patch('managers.scaling.requests.get')
+    def test_create_instances_quota(self, mock_get, mock_quota):
+        mock_get.return_value.json.return_value = {"count": 9999999}
+        mock_quota.return_value = 0
+        self.manager.run()
+        self.assertFalse(self.manager.count_instances)
+
+    def tearDown(self):
+        self.manager.terminate_instances()
 
 
 # @mock_ec2

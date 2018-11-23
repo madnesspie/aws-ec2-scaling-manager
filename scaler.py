@@ -30,7 +30,6 @@ logger = get_logger(__name__)
 # TODO: Документация
 
 # Обязательно:
-# TODO: Инстансы спотогого типа приstrенить
 # TODO: Тесты
 
 
@@ -45,8 +44,7 @@ def start():
 
     while killer.pardoned:
         try:
-            manager.run()
-            # manager.create_instances(1)
+            manager.terminate_instances()
         except RequestException:
             logger.warning(f"Request for number of backtests failed!")
         except ClientError as e:
